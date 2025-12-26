@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: 2025 Stefan Krüger s-light.eu
 #
 # SPDX-License-Identifier: MIT
+# 
+# based 
+# https://github.com/DaAwesomeP/dmxusb/
+# by Perry Naseck (DaAwesomeP)
 
 """
 `s-light_dmxusb`
@@ -49,19 +53,25 @@ except ImportError:
     pass
 
 DEVICE_EMULATED_ULTRA_DMX_MICRO = {
-    "NAME": "emulated Ultra DMX Micro",
+    "NAME": b"emulated Ultra DMX Micro",
     "ESTA_ID": 0x6A6B,
     "DEVICE_ID": 0x3,
+    "UNIVERSE_OUT": 1,
+    "UNIVERSE_IN": 0,
 }
 DEVICE_EMULATED_DMXKING_UltraDMXPro = {
-    "NAME": "emulated DMXKing UltraDMXPro",
+    "NAME": b"emulated DMXKing UltraDMXPro",
     "ESTA_ID": 0x6A6B,
     "DEVICE_ID": 0x2,
+    "UNIVERSE_OUT": 2,
+    "UNIVERSE_IN": 0,
 }
 DEVICE_DMXUSB = {
-    "NAME": "DMXUSB",
+    "NAME": b"DMXUSB",
     "ESTA_ID": 0x7FF7,
-    "DEVICE_ID": 0x32,
+    "DEVICE_ID": 0x42,
+    "UNIVERSE_OUT": 3,
+    "UNIVERSE_IN": 0,
 }
 
 # Byte order for Enttec/DMXKing protocol
@@ -97,6 +107,7 @@ LABEL_Lookup = {
 
 MAX_CHANNELS = 512
 
+
 def format_bytearray_as_int_string(bytearray_in: bytearray) -> string:
     in_as_str_array = [f"{x:>3d}" for x in bytearray_in]
     return f"[{
@@ -104,6 +115,7 @@ def format_bytearray_as_int_string(bytearray_in: bytearray) -> string:
         in_as_str_array
         )
     }]"
+
 
 class DMXUSB:
     """DMXUSB API
@@ -119,7 +131,7 @@ class DMXUSB:
         *,
         uart: UART,
         callback_dmxin: Callable[[int, bytearray], None],
-        universes_out: int = 1,
+        universes_out: int | None = None,
         serial_number: bytearray = None,
         mode=DEVICE_EMULATED_ULTRA_DMX_MICRO,
         # universes_in=1,
@@ -130,8 +142,13 @@ class DMXUSB:
         self._uart = uart
         self._mode = mode
         self._callback_dmxin = callback_dmxin
+
         self._universes_out = universes_out
         self._universes_in = 0
+        if self._universes_out is None:
+            self._universes_out = self._mode["UNIVERSE_OUT"]
+        if self._debug:
+            print(f"  _universes_out: {self._universes_out}")
 
         self._serial_number = serial_number
         if serial_number is None:
@@ -181,11 +198,16 @@ class DMXUSB:
 
     def _send_WIDGET_PARAMETER(self) -> None:
         data = [
-            0x03,  # firmware version LSB: 3 (v0.0.4)
-            0x00,  # firmware version MSB: 0
-            0x09,  # DMX output break time in 10.67 microsecond units: 9 (TODO: CALCUALTE WITH BAUDRATE)
-            0x01,  # DMX output Mark After Break time in 10.67 microsecond units: 1 (TODO: CALCUALTE WITH BAUDRATE)
-            0x28,  # DMX output rate in packets per second: 40 (TODO: CALCUALTE WITH BAUDRATE)
+            # firmware version LSB: 3 (v0.0.4)
+            0x03,
+            # firmware version MSB: 0
+            0x00,
+            # DMX output break time in 10.67 microsecond units: 9 (TODO: CALCUALTE WITH BAUDRATE)
+            0x09,
+            # DMX output Mark After Break time in 10.67 microsecond units: 1 (TODO: CALCUALTE WITH BAUDRATE)
+            0x01,
+            # DMX output rate in packets per second: 40 (TODO: CALCUALTE WITH BAUDRATE)
+            0x28,
         ]
         self._send_message(LABEL_WIDGET_PARAMETER_REQUEST, data)
 
@@ -200,18 +222,24 @@ class DMXUSB:
         if self._debug:
             print("_handle_DMX_data_received()")
             print(f"  data: {format_bytearray_as_int_string(self._buffer_data)}")
-        # if self._label == LABEL_DMX_DATA and self._mode == DEVICE_EMULATED_ULTRA_DMX_MICRO:
-        #     self._callback_dmxin(universe = 0, self._buffer_data)
-        # elif self._label == LABEL_DMX_DATA and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro:
-        #     self._callback_dmxin(universe = 0, self._buffer_data)
-        #     self._callback_dmxin(universe = 1, self._buffer_data)
-        # elif self._label == LABEL_DMX_DATA and self._mode == DEVICE_DMXUSB:
-        #     for universe_index in range(self._universes_out):
-        #         self._callback_dmxin(universe = universe_index, self._buffer_data)
+        if (
+            self._label == LABEL_DMX_DATA
+            and self._mode == DEVICE_EMULATED_ULTRA_DMX_MICRO
+        ):
+            self._callback_dmxin(universe=0, data=self._buffer_data)
+        elif (
+            self._label == LABEL_DMX_DATA
+            and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro
+        ):
+            self._callback_dmxin(universe=0, data=self._buffer_data)
+            self._callback_dmxin(universe=1, data=self._buffer_data)
+        elif self._label == LABEL_DMX_DATA and self._mode == DEVICE_DMXUSB:
+            for universe_index in range(self._universes_out):
+                self._callback_dmxin(universe = universe_index, data=self._buffer_data)
         # elif self._label == LABEL_DMX_DATA2 and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro:
-        #     self._callback_dmxin(universe = 0, self._buffer_data)
+        #     self._callback_dmxin(universe = 0, data=self._buffer_data)
         # elif (self._label == LABEL_DMX_DATA2 + 1) and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro:
-        #     self._callback_dmxin(universe = 1, self._buffer_data)
+        #     self._callback_dmxin(universe = 1, data=self._buffer_data)
         # else self._mode == DEVICE_DMXUSB:
         #     self._callback_dmxin(universe = self._label - LABEL_DMX_DATA2, data=self._buffer_data)
 
@@ -235,10 +263,11 @@ class DMXUSB:
         self._last_action = time.monotonic()
 
     def _parse(self) -> None:
-        if self._debug:
-            print(
-                f"parse: label: '{self._label}' {LABEL_Lookup[self._label]} _msg_length: '{self._msg_length}' _data_rest_count: '{self._data_rest_count}' "
-            )
+        # if self._debug:
+        #     print(
+        #         f"parse: label: '{self._label}' {LABEL_Lookup[self._label]} _msg_length: '{self._msg_length}'"
+        #         # f" _data_rest_count: '{self._data_rest_count}' "
+        #     )
         if self._label is LABEL_ESTA_ID_REQUEST:
             self._send_ESTA_ID()
         elif self._label is LABEL_DEVICE_ID_REQUEST:

@@ -30,6 +30,8 @@ dmxusb = dmxusb.DMXUSB(
     # uart=board.UART(),
     uart=uart,
     callback_dmxin=callback_dmxin_fn,
+    # mode=dmxusb.DEVICE_EMULATED_DMXKING_UltraDMXPro
+    mode=dmxusb.DEVICE_DMXUSB,
 )
 
 
