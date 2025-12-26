@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2025 Stefan Krüger s-light.eu
 #
 # SPDX-License-Identifier: MIT
-# 
-# based 
+#
+# based
 # https://github.com/DaAwesomeP/dmxusb/
 # by Perry Naseck (DaAwesomeP)
 
@@ -235,13 +235,20 @@ class DMXUSB:
             self._callback_dmxin(universe=1, data=self._buffer_data)
         elif self._label == LABEL_DMX_DATA and self._mode == DEVICE_DMXUSB:
             for universe_index in range(self._universes_out):
-                self._callback_dmxin(universe = universe_index, data=self._buffer_data)
-        # elif self._label == LABEL_DMX_DATA2 and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro:
-        #     self._callback_dmxin(universe = 0, data=self._buffer_data)
-        # elif (self._label == LABEL_DMX_DATA2 + 1) and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro:
-        #     self._callback_dmxin(universe = 1, data=self._buffer_data)
-        # else self._mode == DEVICE_DMXUSB:
-        #     self._callback_dmxin(universe = self._label - LABEL_DMX_DATA2, data=self._buffer_data)
+                self._callback_dmxin(universe=universe_index, data=self._buffer_data)
+        elif (
+            self._label == LABEL_DMX_DATA2
+            and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro
+        ):
+            self._callback_dmxin(universe=0, data=self._buffer_data)
+        elif (
+            self._label == LABEL_DMX_DATA2 + 1
+        ) and self._mode == DEVICE_EMULATED_DMXKING_UltraDMXPro:
+            self._callback_dmxin(universe=1, data=self._buffer_data)
+        elif self._mode == DEVICE_DMXUSB:
+            self._callback_dmxin(
+                universe=self._label - LABEL_DMX_DATA2, data=self._buffer_data
+            )
 
     def _buffer_data_clear(self) -> None:
         self._buffer_data_index = 0
